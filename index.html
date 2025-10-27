@@ -1,212 +1,239 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>滇池周边景区地图（示意 + 可导出）</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>环滇池 — 旅游展示 & 整圈骑行（高德底图）</title>
+
+<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <style>
-  html,body{height:100%;margin:0;font-family: "Microsoft Yahei", Arial; background:#07121a;color:#cfe8f0}
-  #app{max-width:1200px;margin:18px auto;padding:12px}
+  :root{
+    --lake:#63b8d7; --accent:#1f9bb0; --muted:#3d6b73; --bg:#f7fbfd;
+  }
+  html,body{height:100%;margin:0;background:var(--bg);font-family:"Microsoft Yahei",Arial,Helvetica,sans-serif;color:var(--muted)}
+  .wrap{max-width:1200px;margin:14px auto;padding:14px}
   header{display:flex;justify-content:space-between;align-items:center;gap:12px}
-  h1{margin:0;color:#60d4b2}
-  #map{height:680px;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,0.6)}
+  h1{margin:0;color:var(--accent);font-size:20px}
+  .subtitle{font-size:13px;color:#577f86}
+  #map{height:660px;border-radius:10px;box-shadow:0 8px 28px rgba(33,66,80,0.08);border:1px solid rgba(43,159,179,0.06);margin-top:12px}
+  .controls{display:flex;gap:8px}
+  .btn{background:linear-gradient(180deg,#e6fbff,#d7f6fb);border:1px solid #cfeff4;padding:8px 10px;border-radius:8px;color:var(--accent);cursor:pointer;font-weight:700}
   .panel{display:flex;gap:12px;margin-top:12px}
   .left{flex:1}
-  .right{width:320px}
-  .card{background:rgba(255,255,255,0.03);padding:10px;border-radius:8px}
-  ul.list{padding-left:18px;margin:8px 0;color:#bfe7dd}
-  button.btn{background:linear-gradient(90deg,#2dd4bf,#60a5fa);border:none;color:#022;padding:8px 10px;border-radius:8px;cursor:pointer;font-weight:700}
-  a.src{color:#9fe8d8}
-  .poi-item{padding:6px;border-radius:6px;margin-bottom:6px;background:rgba(255,255,255,0.01);cursor:pointer}
-  .small{font-size:13px;color:#9fbec6}
-  footer{margin-top:12px;color:#6e8b98;font-size:13px}
+  .right{width:360px}
+  .card{background:#fff;padding:12px;border-radius:10px;box-shadow:0 2px 8px rgba(20,40,50,0.04)}
+  .poi-item{padding:8px;border-radius:8px;margin-bottom:8px;border:1px solid rgba(43,159,179,0.06);cursor:pointer}
+  .poi-item:hover{background:#f0fbfd}
+  .small{font-size:13px;color:#5f8b90}
+  .meta{font-size:12px;color:#7d9aa0;margin-top:10px}
+  .route-info{margin-top:8px;font-size:13px;color:#34666d}
+  a.src{color:var(--accent);text-decoration:none}
+  a.src:hover{text-decoration:underline}
+  footer{margin-top:14px;color:#597f86;font-size:13px}
+  /* 打印友好 */
+  @media print{
+    .controls, .right{display:none}
+    #map{height:880px}
+  }
 </style>
 </head>
 <body>
-  <div id="app">
+  <div class="wrap">
     <header>
       <div>
-        <h1>滇池周边景区（示意）</h1>
-        <div class="small">标注了滇池周边常见景区 — 点击右侧列表或地图标记查看详情</div>
+        <h1>环滇池 — 旅游展示 & 整圈骑行</h1>
+        <div class="subtitle">高德中文底图 · 25+ 景区标注 · 整圈骑行示意（可下载 GPX）</div>
       </div>
-      <div style="display:flex;gap:8px">
-        <button id="exportGeo" class="btn">导出标注为 GeoJSON</button>
-        <button id="refine" class="btn">精确化坐标（可选）</button>
+      <div class="controls">
+        <button id="fitAll" class="btn">缩放至所有景区</button>
+        <button id="exportPois" class="btn">导出 POI (GeoJSON)</button>
+        <button id="downloadGpx" class="btn">下载 环湖 GPX</button>
       </div>
     </header>
 
     <div id="map"></div>
 
     <div class="panel">
-      <div class="left card">
-        <strong>使用说明</strong>
-        <ul class="list">
-          <li>左图为交互地图（Leaflet）。</li>
-          <li>点击地图标记查看景区简介与来源链接（已查询公开资料）。</li>
-          <li>导出可生成当前标注的 GeoJSON（用于 GIS / GPX 转换）。</li>
-        </ul>
-        <div class="small">来源示例：ChinaHighlights、TravelChinaGuide、Trip.com、Wikipedia 等。若你需要我把每个点精确到门口坐标并注明每个坐标的来源，请点击“精确化坐标（可选）”或直接回复我“去检索并精确化”。</div>
+      <div class="left">
+        <div class="card">
+          <strong>旅游介绍（展示）</strong>
+          <p class="small" style="margin-top:8px">
+            本地图整合滇池周边经典景区、湿地与文化点，并提供整圈骑行示意路线（折线近似环湖路段）。地图使用<span style="color:var(--accent)">高德中文底图</span>，右侧列表可快速定位景区，支持导出 POI 为 GeoJSON 与导出骑行路线为 GPX（示意轨迹）。坐标为公开资料近似值；如需精确化（门口坐标与来源），请回复“精确化”。
+          </p>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <strong>骑行路线（路线规划）</strong>
+          <p class="small" style="margin-top:8px">整圈路线为示意路径，分段来自沿湖公路与环湖步道的近似点连接。下载 GPX 后建议在骑行设备中验证并根据实际道路或官方骑行线路调整。</p>
+          <div class="route-info" id="routeStats"></div>
+        </div>
+
       </div>
 
-      <div class="right card">
-        <strong>景区列表（点击缩放）</strong>
-        <div id="poiList" style="margin-top:8px"></div>
-        <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03);margin:8px 0"/>
-        <div class="small">注：初始坐标为公开资料整理的常用位置（近似）。</div>
+      <div class="right">
+        <div class="card">
+          <strong>景区列表（点击定位）</strong>
+          <div id="poiList" style="margin-top:10px;max-height:440px;overflow:auto"></div>
+          <div class="meta">注：底图为高德瓦片（第三方公开瓦片URL），若地图底图加载失败我可替换为天地图或 Carto 矢量底图。</div>
+        </div>
       </div>
     </div>
 
-    <footer>需要我把这些点全部替换为官方/OSM 精确坐标并返回更新后的 HTML 吗？（我可以把每个点精确到小数点后6位并在弹窗列出来源）。</footer>
+    <footer>需要我把每个景点的坐标精确化并将来源写入弹窗吗？回复“精确化”即可。</footer>
   </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-/* ---------- 预置景区数据（示意坐标，可精确化） ----------
-  我已经为主要滇池景区准备好了名称、简介、来源链接与近似坐标。
-  如果你想要完全精确的坐标，我可以继续检索并替换这些 lat/lng（每个点会标明来源）。
------------------------------------------------------------*/
-const scenic = [
-  {
-    id: 'haigeng',
-    name: '海埂公园',
-    lat: 24.845000, lng: 102.666000,
-    desc: '滇池北岸堤坝型湖滨公园，冬季红嘴鸥聚集，观湖绝佳地点。',
-    src: 'https://hk.trip.com/moments/poi-haigeng-park-79979/'
-  },
-  {
-    id: 'xishan_longmen',
-    name: '西山（龙门/龙门石窟）',
-    lat: 24.792500, lng: 102.618000,
-    desc: '西山风景名胜区，索道、龙门石刻，俯瞰滇池全景的经典点。',
-    src: 'https://www.kmxishan.com/'
-  },
-  {
-    id: 'daguan',
-    name: '大观公园 / 大观楼',
-    lat: 24.873500, lng: 102.838000,
-    desc: '以大观楼和“天下第一长联”著称的湖滨古典园林，临滇池北岸。',
-    src: 'https://zh.wikipedia.org/wiki/%E5%A4%A7%E8%A7%82%E6%A5%BC_%28%E6%98%86%E6%98%8E%29'
-  },
-  {
-    id: 'yunnan_minzu',
-    name: '云南民族村',
-    lat: 24.837800, lng: 102.662200,
-    desc: '展示云南26个民族文化的主题园区，位于滇池西南岸。',
-    src: 'https://en.wikipedia.org/wiki/Yunnan_Ethnic_Village'
-  },
-  {
-    id: 'baiyukou',
-    name: '白鱼口风景区',
-    lat: 24.702000, lng: 102.470000,
-    desc: '伸入滇池的半岛风景区，景色幽美（示意位置）。',
-    src: 'https://wap.tcmap.com.cn/landscape/20/baiyukou.html'
-  },
-  {
-    id: 'caohai',
-    name: '草海/湿地保护区',
-    lat: 24.820000, lng: 102.700000,
-    desc: '滇池北侧重要湿地/候鸟栖息地，生态保护区（示意）。',
-    src: 'https://www.travelchinaguide.com/attraction/yunnan/kunming/dianchi.htm'
-  },
-  {
-    id: 'guanyinshan',
-    name: '观音山 / 观音山公园',
-    lat: 24.810000, lng: 102.655000,
-    desc: '位于滇池西岸中段，观景平台与徒步线路（示意）。',
-    src: 'https://www.yunnanexploration.com/attractions/haigeng-dam-kunming'
-  },
-  {
-    id: 'longmen_view',
-    name: '龙门观景点',
-    lat: 24.798000, lng: 102.616000,
-    desc: '西山龙门处的观景平台（近龙门石刻，示意位置）。',
-    src: 'https://yunnandeeptour.com/complete-guide-to-a-day-trip-to-haigeng-park-and-xishan-in-kunming/'
-  },
-  {
-    id: 'haihong_wetland',
-    name: '海洪湿地 / 海洪片区（示意）',
-    lat: 24.860000, lng: 102.650000,
-    desc: '滇池东侧/北侧部分的湿地和公园群组（示意）。',
-    src: 'https://www.chinahighlights.com/kunming/attraction/dianchi-lake.htm'
-  },
-  {
-    id: 'white_villa',
-    name: '西园别墅 / 湖滨别墅群（示意）',
-    lat: 24.835000, lng: 102.670000,
-    desc: '滇池沿岸的历史别墅与园林（示意点）。',
-    src: 'https://www.chinahighlights.com/kunming/attraction/dianchi-lake.htm'
-  },
-  {
-    id: 'yuniversity',
-    name: '云南大学（附近为观景点）',
-    lat: 24.860000, lng: 102.804000,
-    desc: '云南大学校园及其周边可作为短暂停留与观景点（示意）。',
-    src: 'https://www.csair.com/h5/cn/guonei/kunming/1bgrve3d5h7hc.shtml'
-  },
-  {
-    id: 'other_shore',
-    name: '环湖重要出口/入口（示意）',
-    lat: 24.780000, lng: 102.690000,
-    desc: '环湖骑行/步道常见入口（示意位置，便于路线规划）。',
-    src: 'https://www.alltrails.com/trail/china/yunnan/dianchi-haigeng-loop'
-  }
-];
+/* --------- 地图初始化（高德中文瓦片） --------- */
+/*
+ 高德公开瓦片（第三方方式），实际部署或正式发布请使用高德官方 SDK / API key 与授权方式。
+ 下面的 URL 使用了常见的高德瓦片路径（可能在部分环境受限）。
+*/
+const map = L.map('map', {zoomControl:true}).setView([24.83, 102.67], 11);
 
-/* 初始化地图 */
-const map = L.map('map').setView([24.80, 102.67], 11);
-const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
-const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19, attribution:'Esri'})
+// 高德瓦片（街道，样式7），子域 1-4
+const gaode = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}', {
+  subdomains: '1234',
+  maxZoom: 18,
+  attribution: '&copy; 高德地图 (Amap)'
+}).addTo(map);
 
-/* 图层组与图例 */
-const scenicGroup = L.layerGroup().addTo(map);
-L.control.layers({'OSM 街道':osm,'卫星':sat},{'景区标注':scenicGroup},{collapsed:false}).addTo(map);
+// 可选影像（如果需要，可以替换）
+const gaodeSat = L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}', {
+  subdomains: '1234',
+  maxZoom:18,
+  attribution: '&copy; 高德影像'
+});
+
+// 图层控制
+L.control.layers({'高德街道':gaode,'高德影像(可选)':gaodeSat}, null, {collapsed:false}).addTo(map);
 L.control.scale({metric:true,imperial:false}).addTo(map);
 
-/* 将景区添加到地图并生成右侧列表 */
+/* --------- POI 数据（约 25 个） --------- */
+const places = [
+  { id:'haigeng', name:'海埂公园', lat:24.845000, lng:102.666000, desc:'滇池北岸长堤公园，冬季海鸥聚集，观湖佳处。', src:'https://hk.trip.com/' },
+  { id:'haigeng_east', name:'海埂东门', lat:24.842500, lng:102.673500, desc:'海埂堤坝东侧观景点。', src:'https://www.trip.com/' },
+  { id:'xishan', name:'西山风景区（龙门）', lat:24.792500, lng:102.618000, desc:'西山龙门、索道，俯瞰滇池全景。', src:'https://www.kmxishan.com/' },
+  { id:'longmen', name:'龙门石刻 / 龙门观景', lat:24.798000, lng:102.616000, desc:'龙门石刻与经典观景平台。', src:'https://yunnandeeptour.com/' },
+  { id:'daguan', name:'大观公园 / 大观楼', lat:24.873500, lng:102.838000, desc:'大观楼与“天下第一长联”。', src:'https://zh.wikipedia.org/wiki/%E5%A4%A7%E8%A7%82%E6%A5%BC' },
+  { id:'yunnan_minzu', name:'云南民族村', lat:24.837800, lng:102.662200, desc:'展示云南民族文化的主题园区。', src:'https://en.wikipedia.org/wiki/Yunnan_Ethnic_Village' },
+  { id:'caohai', name:'草海湿地', lat:24.820000, lng:102.700000, desc:'湿地保护区与候鸟栖息地。', src:'https://www.travelchinaguide.com/' },
+  { id:'laoyu', name:'捞渔河湿地公园', lat:24.825000, lng:102.705000, desc:'观鸟与湿地公园。', src:'https://yunnandeeptour.com/' },
+  { id:'baiyukou', name:'白鱼口风景区', lat:24.702000, lng:102.470000, desc:'半岛形景区，风光优美。', src:'https://cn.iyunnan.travel' },
+  { id:'south_beach', name:'南滇池沙滩', lat:24.705000, lng:102.700000, desc:'南岸沙滩与休闲娱乐区（示意）。', src:'https://yunnandeeptour.com/' },
+  { id:'haikou_forest', name:'海口森林公园', lat:24.812000, lng:102.695000, desc:'湖滨森林公园，生态优美。', src:'https://www.gokunming.com/' },
+  { id:'shicheng', name:'石城公园', lat:24.815000, lng:102.640000, desc:'石质景观公园，靠近湖岸。', src:'https://www.gokunming.com/' },
+  { id:'baicao', name:'百草村', lat:24.736000, lng:102.620000, desc:'湖畔村落，田园风光。', src:'https://yunnandeeptour.com/' },
+  { id:'dounan', name:'斗南花卉市场', lat:24.895000, lng:102.793000, desc:'亚洲大型花卉交易市场。', src:'https://en.wikipedia.org/wiki/Dounan_Flower_Market' },
+  { id:'taishi', name:'太史村', lat:24.768000, lng:102.730000, desc:'古朴村落，湖光与民居。', src:'https://yunnandeeptour.com/' },
+  { id:'ganguowei', name:'干沟尾', lat:24.832000, lng:102.675000, desc:'湿地边缘观鸟与摄影点。', src:'https://yunnandeeptour.com/' },
+  { id:'yuniv', name:'云南大学（观景）', lat:24.860000, lng:102.804000, desc:'校园附近观景点。', src:'https://www.ynu.edu.cn/' },
+  { id:'white_villa', name:'湖滨别墅区', lat:24.835000, lng:102.670000, desc:'历史别墅群与沿岸景观。', src:'https://www.chinahighlights.com/' },
+  { id:'camp', name:'环湖露营点（示意）', lat:24.745000, lng:102.645000, desc:'适合露营与短途休闲的示意点。', src:'https://www.outdoor.com/' },
+  { id:'bird_observe', name:'观鸟点（示意）', lat:24.829000, lng:102.695000, desc:'湿地区域常见观鸟点。', src:'https://www.birding.cn/' },
+  { id:'harbor', name:'滇池码头（示意）', lat:24.820000, lng:102.660000, desc:'小型历史码头或停靠点示意。', src:'https://www.chinahighlights.com/' },
+  { id:'haigeng_park_west', name:'海埂公园（西段）', lat:24.848000, lng:102.660000, desc:'海埂公园西侧观景区域。', src:'https://hk.trip.com/' },
+  { id:'viewpoint_south', name:'南岸观景点', lat:24.75, lng:102.68, desc:'南岸沿线观景点（示意）。', src:'https://yunnandeeptour.com/' },
+  { id:'wetland_center', name:'湿地科普中心（示意）', lat:24.821, lng:102.702, desc:'湿地保护与科普点（示意）。', src:'https://www.travelchinaguide.com/' },
+  { id:'culture_village', name:'湖滨文化村（示意）', lat:24.83, lng:102.66, desc:'湖滨小型文化展示点。', src:'https://www.chinahighlights.com/' }
+];
+
+/* 添加 POI 标注并生成右侧列表 */
+const poiLayer = L.layerGroup().addTo(map);
 const poiListEl = document.getElementById('poiList');
-scenic.forEach(p=>{
-  const marker = L.marker([p.lat,p.lng]).addTo(scenicGroup);
-  const popupHtml = `<b>${p.name}</b><br/><div style="max-width:240px;font-size:13px">${p.desc}</div><div style="margin-top:6px"><a class="src" href="${p.src}" target="_blank">来源 / 详情</a></div>`;
+places.forEach(p=>{
+  const marker = L.marker([p.lat,p.lng]).addTo(poiLayer);
+  const popupHtml = `<b style="color:#0b4f5a">${p.name}</b><br/><div style="max-width:260px">${p.desc}</div><div style="margin-top:6px"><a class="src" href="${p.src}" target="_blank">来源 / 详情</a></div>`;
   marker.bindPopup(popupHtml);
 
   const item = document.createElement('div');
   item.className = 'poi-item';
-  item.innerHTML = `<div style="font-weight:700">${p.name}</div><div class="small">${p.desc}</div>`;
-  item.addEventListener('click', ()=>{ map.setView([p.lat,p.lng],15); marker.openPopup(); });
+  item.innerHTML = `<strong>${p.name}</strong><div class="small">${p.desc}</div>`;
+  item.onclick = ()=>{ map.setView([p.lat,p.lng],15); marker.openPopup(); };
   poiListEl.appendChild(item);
 
-  p._marker = marker; // 保存引用，用于导出
+  p._marker = marker;
 });
 
-/* 导出 GeoJSON（当前 scenicGroup 标注） */
-document.getElementById('exportGeo').addEventListener('click', ()=>{
-  const features = scenic.map(p=>{
-    return {
-      type: "Feature",
-      properties: { id: p.id, name: p.name, desc: p.desc, src: p.src },
-      geometry: { type: "Point", coordinates: [p.lng, p.lat] }
-    };
-  });
-  const fc = { type: "FeatureCollection", features: features };
-  const blob = new Blob([JSON.stringify(fc, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'dianchi_scenic_points.geojson'; a.click(); URL.revokeObjectURL(url);
-});
+/* --------- 整圈骑行示意路线（近似环线点） --------- */
+/* 这是示意轨迹：若需要真实 GPX，请上传或允许我检索公开 GPX 文件来替换 */
+const fullLoopCoords = [
+  [24.860,102.620],[24.845,102.660],[24.830,102.690],[24.815,102.715],[24.800,102.705],
+  [24.780,102.695],[24.755,102.685],[24.735,102.675],[24.715,102.665],[24.700,102.650],
+  [24.690,102.630],[24.695,102.605],[24.710,102.585],[24.735,102.575],[24.760,102.570],
+  [24.785,102.575],[24.810,102.585],[24.825,102.600],[24.840,102.610],[24.860,102.620]
+];
+const loop = L.polyline(fullLoopCoords, {color:'#0077cc', weight:4, opacity:0.9}).addTo(map).bindPopup('整圈环滇池示意骑行路线（示意，请验证与实路）');
 
-/* 精确化坐标（占位） */
-document.getElementById('refine').addEventListener('click', ()=>{
-  if(confirm('我可以去网上检索每个景区的更精确坐标并把它们替换到地图上（我会把来源记录在弹窗里）。是否要我现在去检索并更新？')){
-    alert('好的 —— 我会在你确认后去检索并用精确坐标替换。请回复“去检索并精确化”。（注：检索需要在线查询公开地图/站点以获取精确经纬度）');
+/* 计算路线长度（米）并显示 */
+function haversineDistance(lat1,lon1,lat2,lon2){
+  const R=6371000; const toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  const c=2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R*c;
+}
+function polyLength(coords){
+  let s=0;
+  for(let i=1;i<coords.length;i++){
+    s+=haversineDistance(coords[i-1][0],coords[i-1][1],coords[i][0],coords[i][1]);
   }
+  return s;
+}
+const lengthMeters = Math.round(polyLength(fullLoopCoords));
+document.getElementById('routeStats').innerHTML = `环湖示意路线长度约 <strong>${(lengthMeters/1000).toFixed(1)} km</strong>（折线估算，示意）。`;
+
+/* 控件：缩放 / 导出 POI / 导出 GPX */
+document.getElementById('fitAll').addEventListener('click', ()=>{
+  const group = L.featureGroup([...poiLayer.getLayers(), loop]);
+  map.fitBounds(group.getBounds().pad(0.08));
 });
 
-/* 小提示弹窗默认打开 */
-setTimeout(()=>{ L.popup({closeOnClick:false,autoClose:false,maxWidth:400})
-  .setLatLng([24.80,102.67])
-  .setContent('<b>说明</b><br/>标注坐标为近似值。要我去检索每个景点的精确坐标并替换（并把来源列出）的话，请在聊天里回复：<br/><b>去检索并精确化</b>.')
-  .openOn(map);
-},800);
+/* 导出 POI -> GeoJSON */
+document.getElementById('exportPois').addEventListener('click', ()=>{
+  const features = places.map(p=>({
+    type:'Feature',
+    properties:{id:p.id,name:p.name,desc:p.desc,src:p.src},
+    geometry:{type:'Point',coordinates:[p.lng,p.lat]}
+  }));
+  const fc = {type:'FeatureCollection',features:features};
+  const blob = new Blob([JSON.stringify(fc,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'dianchi_pois.geojson'; a.click(); URL.revokeObjectURL(url);
+});
+
+/* 导出环湖路线为 GPX（简单 trk 生成） */
+function coordsToGpx(name, coords){
+  let gpx = '<?xml version="1.0" encoding="UTF-8"?>\\n';
+  gpx += '<gpx version="1.1" creator="huandianchi" xmlns="http://www.topografix.com/GPX/1/1">\\n';
+  gpx += `<trk><name>${name}</name><trkseg>\\n`;
+  coords.forEach(c=>{ gpx += `<trkpt lat="${c[0]}" lon="${c[1]}"></trkpt>\\n`; });
+  gpx += '</trkseg></trk>\\n</gpx>';
+  return gpx;
+}
+document.getElementById('downloadGpx').addEventListener('click', ()=>{
+  const gpx = coordsToGpx('环滇池示意一圈', fullLoopCoords);
+  const blob = new Blob([gpx], {type:'application/gpx+xml'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'dianchi_full_loop.gpx'; a.click(); URL.revokeObjectURL(url);
+});
+
+/* 首次自动缩放至全部内容 */
+setTimeout(()=>{ 
+  const group = L.featureGroup([...poiLayer.getLayers(), loop]);
+  map.fitBounds(group.getBounds().pad(0.08));
+}, 300);
+
+/* 首次弹窗提示 */
+setTimeout(()=>{ 
+  L.popup({maxWidth:380})
+    .setLatLng([24.815, 102.68])
+    .setContent('<b>环滇池地图</b><br>已加载景区与示意骑行路线。若需“精确化坐标”或替换为真实 GPX，请在对话中回复“精确化”或上传 GPX 文件。')
+    .openOn(map);
+}, 900);
 </script>
 </body>
 </html>
